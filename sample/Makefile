@@ -1,15 +1,15 @@
-# Makefile for automating content generation
+# 自动生成内容的 Makefile
 
 include input.mk
 
-# Defaults
+# 默认配置
 PYTHON := python3
 SCRIPTS := scripts
 GEMINI := $(PYTHON) $(SCRIPTS)/gemini_wrapper.py
-# If real gemini cli exists, use it:
+# 如果真实环境有 gemini cli，可以使用：
 # GEMINI := gemini --yolo
 
-# Output directories
+# 输出目录
 HTML_DIR := html
 
 .PHONY: all index chapters images html commit clean list_chapters
@@ -21,63 +21,61 @@ all:
 	@$(MAKE) html
 	@$(MAKE) commit
 
-# Step 1: Generate index.md
+# 第一步：生成 index.md
 index.md: input.mk CLAUDE.md
-	@echo "Generating index.md..."
-	@$(GEMINI) text --context CLAUDE.md --prompt "Topc: $(TOPIC). File organization is index.md + chapter1.md + ... Now generate index.md, containing detailed chapter list (filenames must be chapter1.md, chapter2.md, etc.), and detailed section list for each chapter. Please output in Chinese. Use Markdown code block." > index.raw
+	@echo "正在生成 index.md..."
+	@$(GEMINI) text --context CLAUDE.md --prompt "主题: $(TOPIC)。文件组织是 index.md + chapter1.md + ... 现在生成 index.md，包含详细的章节列表（文件名必须是 chapter1.md, chapter2.md 等），以及每章的详细小节列表。请用中文输出。使用 Markdown 代码块。" > index.raw
 	@$(PYTHON) $(SCRIPTS)/extract_md.py index.raw > index.md
-	# @rm index.raw
+	@rm index.raw
 
-# Step 2: Generate chapters
-# We need to know the list of chapters. We can generate a helper makefile.
+# 第二步：生成章节
+# 我们需要从 index.md 中解析出章节列表。我们可以生成一个辅助的 makefile 片段。
 chapters.mk: index.md
-	@echo "Parsing chapters from index.md..."
+	@echo "正在从 index.md 解析章节..."
 	@echo "CHAPTERS := $$($(PYTHON) $(SCRIPTS)/parse_chapters.py index.md)" > chapters.mk
 
 -include chapters.mk
 
 chapters: chapters.mk
 	@if [ -z "$(CHAPTERS)" ]; then \
-		echo "No chapters found in index.md"; \
+		echo "在 index.md 中未找到章节"; \
 		exit 1; \
 	fi
-	@echo "Generating chapters: $(CHAPTERS)"
+	@echo "正在生成章节: $(CHAPTERS)"
 	@$(MAKE) -j 4 $(CHAPTERS)
 
-# Rule for individual chapters
+# 单个章节的生成规则
 chapter%.md: index.md CLAUDE.md
-	@echo "Generating $@..."
-	@$(GEMINI) text --context CLAUDE.md index.md --prompt "Generate $@ (Chapter $*). High quality, detailed. Use index.md as outline. Output in Chinese. Use Markdown code block." > $@.raw
+	@echo "正在生成 $@..."
+	@$(GEMINI) text --context CLAUDE.md index.md --prompt "生成 $@ (第 $* 章)。高质量，详细。使用 index.md 作为大纲。中文输出。使用 Markdown 代码块。" > $@.raw
 	@$(PYTHON) $(SCRIPTS)/extract_md.py $@.raw > $@
 	@rm $@.raw
 
-# Step 3: Generate images
-# Images depend on their respective chapters
+# 第三步：生成图片
+# 图片依赖于对应的章节
 IMAGES := $(CHAPTERS:.md=.png)
 
 images: chapters
-	@echo "Generating images: $(IMAGES)"
+	@echo "正在生成图片: $(IMAGES)"
 	@$(MAKE) -j 1 $(IMAGES)
 
-# Rule for individual images
+# 单个图片的生成规则
 chapter%.png: chapter%.md
-	@echo "Generating image for $<..."
-	@$(GEMINI) image --context $< --prompt "Generate a vertical poster summarizing this chapter in Chiikawa style. First details, then summary. Chinese text." --output $@
+	@echo "正在为 $< 生成图片..."
+	@$(GEMINI) image --context $< --prompt "根据本章内容，以吉伊卡哇风格生成一篇总结竖版海报（先分别细说细节，最后再进行总结比较）。真的生成图（中文）。" --output $@
 
-# Step 4: Convert to HTML
+# 第四步：转换为 HTML
 html: $(CHAPTERS) $(IMAGES) index.md
-	@echo "Converting to HTML..."
+	@echo "正在转换为 HTML..."
 	@mkdir -p $(HTML_DIR)
 	@$(PYTHON) $(SCRIPTS)/convert.py . $(HTML_DIR)
 
-# Step 5: Git Commit
+# 第五步：Git 提交
 commit:
-	@echo "Committing changes..."
+	@echo "正在提交更改..."
 	git add .
-	git commit -m "Auto-generated content for $(TOPIC)" || echo "Nothing to commit"
+	git commit -m "自动生成内容: $(TOPIC)" || echo "没有需要提交的内容"
 
 clean:
 	rm -f index.md chapter*.md *.png chapters.mk index.raw *.raw
 	rm -rf $(HTML_DIR)
-
-debug:\n\twhich python3\n\tpython3 --version
