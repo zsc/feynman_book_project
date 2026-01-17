@@ -9,4 +9,6 @@
 gemini-3-pro 的调用用 gemini-cli（`gemini --yolo`）。gpt5-pro 得手动（但也尽量自动准备好输入，和尽量自动处理输出来兜底）。
 
 ----
+注意调模型（通过 gemini-cli 还是脚本）有出错率，要利用 Makefile 的 cache 和进行容错。调gemini 文字生成时可以有 <=4 的并发，但生图时 <=1 并发。两个互相也不要并发。
+尽量用 .mk 的 include机制表示拼接(相比用 cat，echo 硬拼)。
 现在在 sample 目录下生成 Makefile 等 scaffold 文件。
